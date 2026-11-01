@@ -60,6 +60,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
 .price table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .price td{padding:6px 0;border-bottom:1px solid var(--line)}
 .price td:last-child{text-align:left;white-space:nowrap}
+.price .disc td{color:var(--ok);font-weight:700}
 .price .total td{font-weight:700;font-size:1.15rem;border-bottom:none}
 pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;font:inherit;font-size:.95rem;max-height:340px;overflow:auto;margin:0}
 .actions{display:flex;flex-wrap:wrap;gap:10px}
@@ -256,7 +257,7 @@ function build(){
   else{p=calc();
     box.innerHTML='<p class="verdict">סוג הפרויקט: דף נחיתה. מחיר משוער (סופי לאחר אישור שמואל):</p><table>'+
       p.rows.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+' ₪</td></tr>').join('')+
-      (p.sum>800?'<tr><td>הנחה עד התקרה</td><td>−'+(p.sum-800)+' ₪</td></tr>':'')+
+      (p.sum>800?'<tr class="disc"><td>🎉 מזל טוב! יש לך הנחה</td><td>−'+(p.sum-800)+' ₪</td></tr>':'')+
       '<tr class="total"><td>סה"כ</td><td>'+p.total+' ₪</td></tr></table>';}
   const L=(k,v)=>v&&v.length?k+': '+(Array.isArray(v)?v.join(', '):v)+'\n':'';
   let t='שאלון אפיון – '+(val('biz')||'ללא שם')+'\n\n';
@@ -267,7 +268,7 @@ function build(){
   t+='\n— עיצוב —\n'+L('לוגו',val('logo'))+L('צבעים',val('colors'))+L('סגנון',picked('style'))+L('השראה',val('refs'));
   t+='\n— פרטים בדף —\n'+L('טלפון',val('pphone'))+L('וואטסאפ',val('pwa'))+L('מייל',val('pmail'))+L('כתובת',val('paddr'))+L('שעות',val('phours'))+L('רשתות',val('psocial'))+L('כפתור ראשי',val('cta'))+L('טופס',picked('form1'));
   t+='\n— תמונות וטכני —\n'+L('תמונות',val('imgs'))+L('דומיין',val('domain'))+L('תוספות',picked('extras'))+L('דדליין',val('deadline'))+L('הערות',val('notes'));
-  if(p)t+='\n— מחיר משוער —\n'+p.rows.map(r=>r[0]+': '+r[1]+' ₪').join('\n')+'\nסה"כ: '+p.total+' ₪\n';
+  if(p)t+='\n— מחיר משוער —\n'+p.rows.map(r=>r[0]+': '+r[1]+' ₪').join('\n')+(p.sum>800?'\n🎉 מזל טוב! יש לך הנחה: −'+(p.sum-800)+' ₪':'')+'\nסה"כ: '+p.total+' ₪\n';
   else t+='\nמחיר: ייסגר מול שמואל\n';
   document.getElementById('out').textContent=t;
   document.getElementById('wa').href='https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(t);
