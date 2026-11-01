@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>שאלון אפיון לדף נחיתה ואתר</title>
+<meta name="description" content="כמה דקות של שאלות, ובסוף מקבלים סיכום והצעת מחיר לדף נחיתה או לאתר.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="שאלון אפיון לדף נחיתה ואתר">
+<meta property="og:description" content="כמה דקות של שאלות, ובסוף מקבלים סיכום והצעת מחיר.">
+<meta property="og:locale" content="he_IL">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: one centered column, step rail on top, one card per step, sticky action bar */
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#18212f; --muted:#5b6678; --line:#d9dee7;
+  --accent:#1f56c9; --accent-soft:#e6edfb; --ok:#1d7a4f;
+  --display:"Rubik","Assistant",system-ui,sans-serif; --body:"Assistant",system-ui,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141b; --surface:#181e28; --ink:#e8ecf3; --muted:#9aa5b6; --line:#2b3442;
+  --accent:#6f9bff; --accent-soft:#1d2a44; --ok:#4cc38a; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#10141b; --surface:#181e28; --ink:#e8ecf3; --muted:#9aa5b6; --line:#2b3442;
+  --accent:#6f9bff; --accent-soft:#1d2a44; --ok:#4cc38a; color-scheme:dark;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+.wrap{max-width:720px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:20px}
+header h1{font-family:var(--display);font-size:1.75rem;margin:0 0 4px;text-wrap:balance}
+header p{margin:0;color:var(--muted)}
+.rail{display:flex;gap:6px;flex-wrap:wrap}
+.rail button{flex:1 1 80px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:6px 4px;font:600 .82rem var(--body);cursor:pointer}
+.rail button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.rail button.done{color:var(--ok);border-color:var(--ok)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:18px}
+.card h2{font-family:var(--display);font-size:1.3rem;margin:0}
+.card .hint{margin:-10px 0 0;color:var(--muted);font-size:.95rem}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.field>.lbl{font-weight:700}
+.field small{color:var(--muted)}
+input[type=text],input[type=tel],input[type=email],input[type=url],textarea,select{
+  width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{min-height:84px;resize:vertical}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,.chip input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.chip span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:6px 14px;background:var(--bg);cursor:pointer;font-weight:600;font-size:.95rem}
+.chip input:checked+span{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.verdict{border-radius:10px;padding:12px 14px;background:var(--accent-soft);font-weight:600}
+.bar{position:fixed;bottom:0;inset-inline:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px}
+.bar .in{max-width:720px;margin:0 auto;display:flex;gap:10px;justify-content:space-between;align-items:center}
+.btn{font:700 1rem var(--body);border-radius:10px;padding:10px 18px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn[disabled]{opacity:.4;cursor:default}
+.price{display:flex;flex-direction:column;gap:4px}
+.price table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.price td{padding:6px 0;border-bottom:1px solid var(--line)}
+.price td:last-child{text-align:left;white-space:nowrap}
+.price .total td{font-weight:700;font-size:1.15rem;border-bottom:none}
+pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;font:inherit;font-size:.95rem;max-height:340px;overflow:auto;margin:0}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.note{color:var(--muted);font-size:.92rem;margin:0}
+.toast{color:var(--ok);font-weight:700;min-height:1.4em;margin:0}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:no-preference){.card{transition:opacity .15s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>שאלון אפיון לדף נחיתה או אתר</h1>
+    <p>כמה דקות של שאלות, ובסוף תקבל סיכום מסודר לשליחה לשמואל. אפשר לדלג על כל שאלה שאין לך עליה תשובה.</p>
+  </header>
+  <nav class="rail" id="rail" aria-label="שלבי השאלון"></nav>
+  <form id="f" novalidate>
+
+  <section class="card" data-step="העסק">
+    <h2>1. מי אתם</h2>
+    <div class="grid2">
+      <div class="field"><label for="biz">שם העסק</label><input type="text" id="biz" name="biz"></div>
+      <div class="field"><label for="person">שם איש קשר</label><input type="text" id="person" name="person"></div>
+      <div class="field"><label for="field">תחום העסק</label><input type="text" id="field" name="field" placeholder="למשל: קוסמטיקה, שיפוצים, מורה פרטי"></div>
+      <div class="field"><label for="area">אזור פעילות</label><input type="text" id="area" name="area" placeholder="למשל: ירושלים והסביבה"></div>
+      <div class="field"><label for="cphone">טלפון שלך</label><input type="tel" id="cphone" name="cphone"></div>
+      <div class="field"><label for="cmail">מייל שלך</label><input type="email" id="cmail" name="cmail"></div>
+    </div>
+  </section>
+
+  <section class="card" data-step="מטרה">
+    <h2>2. מה המטרה</h2>
+    <div class="field"><span class="lbl">מה הדף צריך להשיג?</span>
+      <div class="chips" data-name="goal">
+        <label class="chip"><input type="checkbox" value="לקבל פניות / לידים"><span>לקבל פניות</span></label>
+        <label class="chip"><input type="checkbox" value="למכור מוצרים"><span>למכור מוצרים</span></label>
+        <label class="chip"><input type="checkbox" value="לקבוע תורים"><span>לקבוע תורים</span></label>
+        <label class="chip"><input type="checkbox" value="הרשמה לאירוע / קורס"><span>הרשמה לאירוע או קורס</span></label>
+        <label class="chip"><input type="checkbox" value="תדמית ואמינות"><span>תדמית ואמינות</span></label>
+      </div></div>
+    <div class="field"><label for="audience">מי הלקוחות שלך?</label><input type="text" id="audience" name="audience" placeholder="גיל, אזור, סוג לקוח"></div>
+    <div class="field"><span class="lbl">צריך אחד מאלה?</span><small>זה עוזר להבין אם מתאים דף נחיתה או אתר מלא</small>
+      <div class="chips" data-name="sitefeat">
+        <label class="chip"><input type="checkbox" value="כמה עמודים נפרדים"><span>כמה עמודים נפרדים</span></label>
+        <label class="chip"><input type="checkbox" value="חנות ותשלום באתר"><span>חנות ותשלום באתר</span></label>
+        <label class="chip"><input type="checkbox" value="מערכת זימון תורים"><span>מערכת תורים</span></label>
+        <label class="chip"><input type="checkbox" value="בלוג / עדכונים שאני מנהל לבד"><span>בלוג או עדכונים שאני מנהל</span></label>
+        <label class="chip"><input type="checkbox" value="התחברות משתמשים / אזור אישי"><span>אזור אישי למשתמשים</span></label>
+      </div></div>
+    <p class="verdict" id="verdict"></p>
+  </section>
+
+  <section class="card" data-step="מבנה">
+    <h2>3. מבנה ותוכן</h2>
+    <div class="field"><span class="lbl">אילו אזורים תרצה בדף?</span><small>כותרת ראשית ויצירת קשר כלולים תמיד</small>
+      <div class="chips" data-name="sections">
+        <label class="chip"><input type="checkbox" value="אודות"><span>אודות</span></label>
+        <label class="chip"><input type="checkbox" value="שירותים / מוצרים"><span>שירותים או מוצרים</span></label>
+        <label class="chip"><input type="checkbox" value="המלצות לקוחות"><span>המלצות לקוחות</span></label>
+        <label class="chip"><input type="checkbox" value="שאלות נפוצות"><span>שאלות נפוצות</span></label>
+        <label class="chip"><input type="checkbox" value="מחירון"><span>מחירון</span></label>
+        <label class="chip"><input type="checkbox" value="איך זה עובד (תהליך)"><span>איך זה עובד</span></label>
+        <label class="chip"><input type="checkbox" value="הצוות"><span>הצוות</span></label>
+        <label class="chip"><input type="checkbox" value="גלריה / תיק עבודות" data-addon="gallery"><span>גלריה</span></label>
+        <label class="chip"><input type="checkbox" value="מפת הגעה" data-addon="map"><span>מפת הגעה</span></label>
+      </div></div>
+    <div class="field"><label for="texts">יש לך טקסטים מוכנים?</label>
+      <select id="texts" name="texts"><option value="">בחר</option><option>כן, הכל מוכן</option><option>חלקית</option><option>לא, אשמח שתכתבו</option></select></div>
+    <div class="field"><label for="services">מה חשוב שיופיע? שירותים, יתרונות, מה מייחד אותך</label><textarea id="services" name="services"></textarea></div>
+  </section>
+
+  <section class="card" data-step="עיצוב">
+    <h2>4. עיצוב</h2>
+    <div class="grid2">
+      <div class="field"><label for="logo">יש לוגו?</label><select id="logo" name="logo"><option value="">בחר</option><option>כן</option><option>לא</option></select></div>
+      <div class="field"><label for="colors">צבעים מועדפים</label><input type="text" id="colors" name="colors" placeholder="או: לפי הלוגו"></div>
+    </div>
+    <div class="field"><span class="lbl">סגנון</span>
+      <div class="chips" data-name="style">
+        <label class="chip"><input type="checkbox" value="נקי ומינימליסטי"><span>נקי</span></label>
+        <label class="chip"><input type="checkbox" value="יוקרתי"><span>יוקרתי</span></label>
+        <label class="chip"><input type="checkbox" value="צבעוני ושמח"><span>צבעוני</span></label>
+        <label class="chip"><input type="checkbox" value="מקצועי ורציני"><span>מקצועי</span></label>
+        <label class="chip"><input type="checkbox" value="חם ואישי"><span>חם ואישי</span></label>
+      </div></div>
+    <div class="field"><label for="refs">אתרים שאהבת (קישורים)</label><textarea id="refs" name="refs"></textarea></div>
+  </section>
+
+  <section class="card" data-step="יצירת קשר">
+    <h2>5. פרטים שיופיעו בדף</h2>
+    <div class="grid2">
+      <div class="field"><label for="pphone">טלפון</label><input type="tel" id="pphone" name="pphone"></div>
+      <div class="field"><label for="pwa">וואטסאפ</label><input type="tel" id="pwa" name="pwa" placeholder="אם שונה מהטלפון"></div>
+      <div class="field"><label for="pmail">מייל</label><input type="email" id="pmail" name="pmail"></div>
+      <div class="field"><label for="paddr">כתובת</label><input type="text" id="paddr" name="paddr"></div>
+      <div class="field"><label for="phours">שעות פעילות</label><input type="text" id="phours" name="phours"></div>
+      <div class="field"><label for="psocial">רשתות חברתיות</label><input type="text" id="psocial" name="psocial" placeholder="אינסטגרם, פייסבוק..."></div>
+    </div>
+    <div class="field"><label for="cta">מה הלקוח צריך ללחוץ?</label>
+      <select id="cta" name="cta"><option value="">בחר</option><option>לשלוח וואטסאפ</option><option>להתקשר</option><option>למלא טופס</option><option>לקבוע תור</option><option>לקנות</option></select></div>
+    <div class="field"><span class="lbl">טופס יצירת קשר</span>
+      <div class="chips" data-name="form1">
+        <label class="chip"><input type="checkbox" value="טופס שנשלח למייל" data-addon="form"><span>כן, טופס שנשלח אליי למייל</span></label>
+      </div></div>
+  </section>
+
+  <section class="card" data-step="תמונות וטכני">
+    <h2>6. תמונות ופרטים טכניים</h2>
+    <div class="field"><label for="imgs">יש לך תמונות לדף?</label>
+      <select id="imgs" name="imgs"><option value="">בחר</option><option>כן, יש לי</option><option>חלק</option><option>אין, צריך תמונות</option></select>
+      <small>בדף נחיתה אפשר לשלוח תמונות גם אחרי השאלון, עד 3 פעמים</small></div>
+    <div class="field"><label for="domain">יש דומיין (כתובת אתר)?</label>
+      <select id="domain" name="domain"><option value="">בחר</option><option>כן</option><option>לא, צריך לקנות</option><option>לא יודע</option></select></div>
+    <div class="field"><span class="lbl">תוספות</span>
+      <div class="chips" data-name="extras">
+        <label class="chip"><input type="checkbox" value="קידום בסיסי בגוגל (SEO)" data-addon="seo"><span>קידום בסיסי בגוגל</span></label>
+        <label class="chip"><input type="checkbox" value="מעקב כניסות / פיקסל" data-addon="analytics"><span>מעקב כניסות ופיקסל</span></label>
+        <label class="chip"><input type="checkbox" value="התאמת נגישות" data-addon="a11y"><span>נגישות</span></label>
+        <label class="chip"><input type="checkbox" value="שפה נוספת" data-addon="lang"><span>שפה נוספת</span></label>
+        <label class="chip"><input type="checkbox" value="מסירה דחופה (עד 2 ימי עסקים)" data-addon="urgent"><span>מסירה דחופה</span></label>
+      </div></div>
+    <div class="field"><label for="deadline">עד מתי צריך?</label><input type="text" id="deadline" name="deadline"></div>
+    <div class="field"><label for="notes">עוד משהו שחשוב שנדע</label><textarea id="notes" name="notes"></textarea></div>
+  </section>
+
+  <section class="card" data-step="סיכום">
+    <h2>7. סיכום ושליחה</h2>
+    <div class="price" id="price"></div>
+    <pre id="out"></pre>
+    <div class="actions">
+      <a class="btn" id="wa" href="#">שליחה לשמואל בוואטסאפ</a>
+      <button type="button" class="btn ghost" id="copy">העתקת הסיכום</button>
+    </div>
+    <p class="toast" id="toast" role="status"></p>
+    <p class="note">אם הכפתור לא נפתח, אפשר להעתיק את הסיכום ולהדביק בצ'אט עם שמואל. זמני העבודה נספרים בימי עסקים בלבד.</p>
+  </section>
+  </form>
+</div>
+<div class="bar"><div class="in">
+  <button type="button" class="btn ghost" id="prev">הקודם</button>
+  <button type="button" class="btn" id="next">הבא</button>
+</div></div>
+
+<script>
+const WA_NUMBER='972532745665'; // מספר וואטסאפ בפורמט בינלאומי, למשל 972501234567
+const steps=[...document.querySelectorAll('.card')];
+const rail=document.getElementById('rail');
+let cur=0;
+steps.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.textContent=s.dataset.step;b.onclick=()=>go(i);rail.appendChild(b);});
+function go(i){cur=Math.max(0,Math.min(steps.length-1,i));
+  steps.forEach((s,j)=>s.hidden=j!==cur);
+  [...rail.children].forEach((b,j)=>{b.className=j===cur?'on':(j<cur?'done':'');});
+  document.getElementById('prev').disabled=cur===0;
+  const n=document.getElementById('next');n.hidden=cur===steps.length-1;
+  if(cur===steps.length-1)build();
+  window.scrollTo({top:0});
+}
+document.getElementById('prev').onclick=()=>go(cur-1);
+document.getElementById('next').onclick=()=>go(cur+1);
+
+const val=id=>document.getElementById(id).value.trim();
+const picked=name=>[...document.querySelectorAll('[data-name="'+name+'"] input:checked')].map(x=>x.value);
+const addon=k=>!!document.querySelector('input[data-addon="'+k+'"]:checked');
+
+function isSite(){return picked('sitefeat').length>0;}
+function verdict(){document.getElementById('verdict').textContent=isSite()
+  ?'לפי מה שסימנת, מתאים לך אתר מלא. שמואל יעבור על הפרטים ויחזור אליך עם הצעת מחיר.'
+  :'לפי מה שסימנת, מתאים לך דף נחיתה: עמוד אחד ממוקד שמביא פניות. בסוף תראה מחיר משוער.';}
+
+function calc(){
+  const rows=[['דף נחיתה בסיסי: עד 4 אזורים, מותאם לנייד, כפתור וואטסאפ, 3 סבבי תמונות, סבב תיקונים',300]];
+  const content=picked('sections').filter(v=>!['גלריה / תיק עבודות','מפת הגעה'].includes(v)).length;
+  const extra=Math.max(0,content+2-4); // +2 = hero + contact
+  if(extra)rows.push([extra+' אזורים נוספים',extra*50]);
+  if(addon('form'))rows.push(['טופס יצירת קשר למייל',80]);
+  if(addon('gallery'))rows.push(['גלריה',60]);
+  if(addon('map'))rows.push(['מפת הגעה',30]);
+  if(val('texts')==='לא, אשמח שתכתבו')rows.push(['כתיבת טקסטים',100]);
+  if(addon('seo'))rows.push(['קידום בסיסי בגוגל',50]);
+  if(addon('analytics'))rows.push(['מעקב כניסות / פיקסל',50]);
+  if(addon('a11y'))rows.push(['נגישות והצהרת נגישות',70]);
+  if(val('domain')==='כן'||val('domain')==='לא, צריך לקנות')rows.push(['חיבור דומיין (עלות הדומיין עצמו על הלקוח)',50]);
+  if(addon('lang'))rows.push(['שפה נוספת',120]);
+  if(addon('urgent'))rows.push(['מסירה דחופה',100]);
+  const sum=rows.reduce((a,r)=>a+r[1],0);
+  return {rows,sum,total:Math.min(800,sum)};
+}
+
+function build(){
+  const site=isSite();
+  const box=document.getElementById('price');
+  let p=null;
+  if(site){box.innerHTML='<p class="verdict">סוג הפרויקט: אתר. המחיר לאתר נסגר ישירות מול שמואל, והוא יחזור אליך אחרי שיעבור על השאלון.</p>';}
+  else{p=calc();
+    box.innerHTML='<p class="verdict">סוג הפרויקט: דף נחיתה. מחיר משוער (סופי לאחר אישור שמואל):</p><table>'+
+      p.rows.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+' ₪</td></tr>').join('')+
+      (p.sum>800?'<tr><td>הנחה עד התקרה</td><td>−'+(p.sum-800)+' ₪</td></tr>':'')+
+      '<tr class="total"><td>סה"כ</td><td>'+p.total+' ₪</td></tr></table>';}
+  const L=(k,v)=>v&&v.length?k+': '+(Array.isArray(v)?v.join(', '):v)+'\n':'';
+  let t='שאלון אפיון – '+(val('biz')||'ללא שם')+'\n\n';
+  t+='סוג: '+(site?'אתר':'דף נחיתה')+'\n\n';
+  t+='— העסק —\n'+L('שם העסק',val('biz'))+L('איש קשר',val('person'))+L('תחום',val('field'))+L('אזור',val('area'))+L('טלפון',val('cphone'))+L('מייל',val('cmail'));
+  t+='\n— מטרה —\n'+L('מטרות',picked('goal'))+L('קהל יעד',val('audience'))+L('צרכי אתר',picked('sitefeat'));
+  t+='\n— מבנה ותוכן —\n'+L('אזורים',['כותרת ראשית',...picked('sections'),'יצירת קשר'])+L('טקסטים',val('texts'))+L('מה חשוב שיופיע',val('services'));
+  t+='\n— עיצוב —\n'+L('לוגו',val('logo'))+L('צבעים',val('colors'))+L('סגנון',picked('style'))+L('השראה',val('refs'));
+  t+='\n— פרטים בדף —\n'+L('טלפון',val('pphone'))+L('וואטסאפ',val('pwa'))+L('מייל',val('pmail'))+L('כתובת',val('paddr'))+L('שעות',val('phours'))+L('רשתות',val('psocial'))+L('כפתור ראשי',val('cta'))+L('טופס',picked('form1'));
+  t+='\n— תמונות וטכני —\n'+L('תמונות',val('imgs'))+L('דומיין',val('domain'))+L('תוספות',picked('extras'))+L('דדליין',val('deadline'))+L('הערות',val('notes'));
+  if(p)t+='\n— מחיר משוער —\n'+p.rows.map(r=>r[0]+': '+r[1]+' ₪').join('\n')+'\nסה"כ: '+p.total+' ₪\n';
+  else t+='\nמחיר: ייסגר מול שמואל\n';
+  document.getElementById('out').textContent=t;
+  document.getElementById('wa').href='https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(t);
+}
+
+document.getElementById('copy').onclick=async()=>{
+  const toast=document.getElementById('toast');
+  try{await navigator.clipboard.writeText(document.getElementById('out').textContent);toast.textContent='הסיכום הועתק. עכשיו אפשר להדביק אותו בצ\'אט עם שמואל.';}
+  catch(e){toast.textContent='ההעתקה לא עבדה. סמן את הטקסט בתיבה והעתק ידנית.';}
+};
+
+const form=document.getElementById('f');
+form.addEventListener('submit',e=>e.preventDefault());
+form.addEventListener('input',()=>{verdict();save();});
+form.addEventListener('change',()=>{verdict();save();});
+function save(){try{const d={};form.querySelectorAll('input,select,textarea').forEach((el,i)=>{d[el.id||('c'+i)]=el.type==='checkbox'?el.checked:el.value;});localStorage.setItem('intake-draft',JSON.stringify(d));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem('intake-draft')||'{}');form.querySelectorAll('input,select,textarea').forEach((el,i)=>{const k=el.id||('c'+i);if(k in d){if(el.type==='checkbox')el.checked=d[k];else el.value=d[k];}});}catch(e){}}
+load();verdict();go(0);
+</script>
+</body>
+</html>
