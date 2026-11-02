@@ -52,8 +52,12 @@ const SCHEMA = {
 };
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   const key = process.env.GEMINI_API_KEY;
+  if (req.method === 'GET' && req.query && req.query.models === '1' && key) { // TEMP: list available models
+    const m = await (await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': key } })).json();
+    return res.status(200).json((m.models || []).filter(x => (x.supportedGenerationMethods || []).includes('generateContent')).map(x => x.name));
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   if (!key) return res.status(500).json({ error: 'missing_key' });
 
   const { messages, fields, state } = req.body || {};
