@@ -66,6 +66,14 @@ pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
 .actions{display:flex;flex-wrap:wrap;gap:10px}
 .note{color:var(--muted);font-size:.92rem;margin:0}
 .toast{color:var(--ok);font-weight:700;min-height:1.4em;margin:0}
+.msgs{display:flex;flex-direction:column;gap:10px;min-height:260px;max-height:58vh;overflow:auto;padding:2px}
+.msg{max-width:85%;padding:10px 14px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.bot{align-self:flex-start;background:var(--accent-soft)}
+.msg.me{align-self:flex-end;background:var(--bg);border:1px solid var(--line)}
+.msg.wait{color:var(--muted)}
+.composer{display:flex;gap:8px;align-items:flex-end}
+.composer textarea{min-height:48px;flex:1}
+.linkbtn{background:none;border:none;padding:0;color:var(--accent);font:600 .95rem var(--body);cursor:pointer;text-decoration:underline}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:no-preference){.card{transition:opacity .15s}}
 </style>
@@ -75,7 +83,21 @@ pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
   <header>
     <h1>שאלון אפיון לדף נחיתה או אתר</h1>
     <p>כמה דקות של שאלות, ובסוף תקבל סיכום מסודר לשליחה לשמואל. אפשר לדלג על כל שאלה שאין לך עליה תשובה.</p>
+    <p><button type="button" class="linkbtn" id="toChat" hidden>חזרה לשיחה עם העוזר</button></p>
   </header>
+  <section class="card" id="chat" hidden>
+    <h2>שיחה עם העוזר</h2>
+    <p class="hint">פשוט לענות במילים שלך. העוזר ממלא את השאלון בשבילך.</p>
+    <div class="msgs" id="msgs" role="log" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <textarea id="say" rows="2" placeholder="כתוב כאן..." aria-label="ההודעה שלך"></textarea>
+      <button type="submit" class="btn" id="send">שליחה</button>
+    </form>
+    <div class="actions">
+      <button type="button" class="btn ghost" id="toSummary">לסיכום ולמחיר</button>
+      <button type="button" class="btn ghost" id="toForm">מעדיף טופס רגיל</button>
+    </div>
+  </section>
   <nav class="rail" id="rail" aria-label="שלבי השאלון"></nav>
   <form id="f" novalidate>
 
@@ -206,7 +228,7 @@ pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
 
 <script>
 const WA_NUMBER='972532745665'; // מספר וואטסאפ בפורמט בינלאומי, למשל 972501234567
-const steps=[...document.querySelectorAll('.card')];
+const steps=[...document.querySelectorAll('#f .card')];
 const rail=document.getElementById('rail');
 let cur=0;
 steps.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.textContent=s.dataset.step;b.onclick=()=>go(i);rail.appendChild(b);});
@@ -287,6 +309,90 @@ form.addEventListener('change',()=>{verdict();save();});
 function save(){try{const d={};form.querySelectorAll('input,select,textarea').forEach((el,i)=>{d[el.id||('c'+i)]=el.type==='checkbox'?el.checked:el.value;});localStorage.setItem('intake-draft',JSON.stringify(d));}catch(e){}}
 function load(){try{const d=JSON.parse(localStorage.getItem('intake-draft')||'{}');form.querySelectorAll('input,select,textarea').forEach((el,i)=>{const k=el.id||('c'+i);if(k in d){if(el.type==='checkbox')el.checked=d[k];else el.value=d[k];}});}catch(e){}}
 load();verdict();go(0);
+
+/* ---------- עוזר AI: שיחה שממלאת את אותו טופס ---------- */
+const API='/api/chat';
+const GREETING='היי! אני העוזר של שמואל לבניית דפי נחיתה ואתרים 👋\nאשאל אותך כמה שאלות קצרות, ובסוף תקבל סיכום ומחיר משוער.\nבוא נתחיל: מה שם העסק, ובמה הוא עוסק?';
+const $=id=>document.getElementById(id);
+const msgsEl=$('msgs'),say=$('say');
+let chatLog=[],busy=false;
+
+function setMode(m){
+  const chat=m==='chat';
+  $('chat').hidden=!chat;$('toChat').hidden=chat;
+  rail.hidden=chat;form.hidden=chat;document.querySelector('.bar').hidden=chat;
+  try{localStorage.setItem('intake-mode',m);}catch(e){}
+  if(chat){msgsEl.scrollTop=msgsEl.scrollHeight;say.focus();}
+}
+function bubble(role,text,cls){const d=document.createElement('div');d.className='msg '+(role==='user'?'me':'bot')+(cls?' '+cls:'');d.textContent=text;msgsEl.appendChild(d);msgsEl.scrollTop=msgsEl.scrollHeight;return d;}
+function render(){msgsEl.textContent='';bubble('model',GREETING);chatLog.forEach(m=>bubble(m.role,m.text));}
+function saveChat(){try{localStorage.setItem('intake-chat',JSON.stringify(chatLog));}catch(e){}}
+
+// מה שהעוזר צריך לדעת על הטופס: נבנה מה-HTML, כך ששינוי בטופס מגיע לעוזר אוטומטית
+function catalog(){
+  const out=[];
+  form.querySelectorAll('.field').forEach(f=>{
+    const lbl=((f.querySelector(':scope>label,:scope>.lbl')||{}).textContent||'').trim();
+    const sec=f.closest('.card').querySelector('h2').textContent;
+    const note=f.querySelector('small');
+    const chips=f.querySelector('.chips');
+    if(chips){out.push({id:chips.dataset.name,section:sec,label:lbl,type:'multi',options:[...chips.querySelectorAll('input')].map(i=>i.value),note:note?note.textContent:undefined});return;}
+    const el=f.querySelector('input,select,textarea');if(!el||!el.id)return;
+    const o={id:el.id,section:sec,label:lbl,type:el.tagName==='SELECT'?'choice':'text'};
+    if(el.tagName==='SELECT')o.options=[...el.options].map(x=>x.value).filter(Boolean);
+    if(el.placeholder)o.hint=el.placeholder;
+    if(note)o.note=note.textContent;
+    out.push(o);
+  });
+  return out;
+}
+function state(){const s={};catalog().forEach(f=>{const v=f.type==='multi'?picked(f.id):val(f.id);if(v.length)s[f.id]=v;});return s;}
+function apply(updates){
+  (updates||[]).forEach(u=>{
+    const vals=(u.values||[]).map(String);
+    const chips=form.querySelector('[data-name="'+CSS.escape(u.field)+'"]');
+    if(chips){chips.querySelectorAll('input').forEach(i=>i.checked=vals.includes(i.value));return;}
+    const el=document.getElementById(u.field);if(!el||!form.contains(el))return;
+    if(el.tagName==='SELECT'){if([...el.options].some(o=>o.value===vals[0]))el.value=vals[0];}
+    else el.value=vals.join(', ');
+  });
+  verdict();save();
+}
+
+async function send(text){
+  if(busy||!text.trim())return;
+  busy=true;$('send').disabled=true;
+  chatLog.push({role:'user',text:text.trim()});saveChat();
+  bubble('user',text.trim());say.value='';
+  const wait=bubble('model','רגע, חושב...','wait');
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatLog,fields:catalog(),state:state()})});
+    if(!r.ok)throw new Error(r.status===429?'busy':'http');
+    const d=await r.json();
+    apply(d.updates);
+    chatLog.push({role:'model',text:d.reply});saveChat();
+    wait.remove();bubble('model',d.reply);
+    if(d.done)$('toSummary').classList.remove('ghost');
+  }catch(e){
+    wait.remove();
+    chatLog.pop();saveChat();say.value=text;
+    bubble('model',e.message==='busy'
+      ?'יש עומס רגעי. נסה לשלוח שוב בעוד דקה.'
+      :'העוזר לא זמין כרגע. אפשר לנסות שוב, או לעבור לטופס הרגיל. כל מה שכבר סיפרת נשמר בו.','wait');
+  }
+  busy=false;$('send').disabled=false;say.focus();
+}
+
+$('composer').addEventListener('submit',e=>{e.preventDefault();send(say.value);});
+say.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(say.value);}});
+$('toForm').onclick=()=>{setMode('form');go(0);};
+$('toSummary').onclick=()=>{setMode('form');go(steps.length-1);};
+$('toChat').onclick=()=>setMode('chat');
+
+try{chatLog=JSON.parse(localStorage.getItem('intake-chat')||'[]');}catch(e){chatLog=[];}
+render();
+let startMode='chat';try{startMode=localStorage.getItem('intake-mode')||'chat';}catch(e){}
+setMode(startMode);
 </script>
 </body>
 </html>
