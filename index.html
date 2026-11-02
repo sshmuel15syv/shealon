@@ -213,11 +213,12 @@ pre#out{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
     <div class="price" id="price"></div>
     <pre id="out"></pre>
     <div class="actions">
-      <a class="btn" id="wa" href="#">שליחה לשמואל בוואטסאפ</a>
+      <button type="button" class="btn" id="sendLead">שליחת הפנייה לשמואל</button>
+      <a class="btn ghost" id="wa" href="#">שליחה בוואטסאפ</a>
       <button type="button" class="btn ghost" id="copy">העתקת הסיכום</button>
     </div>
     <p class="toast" id="toast" role="status"></p>
-    <p class="note">אם הכפתור לא נפתח, אפשר להעתיק את הסיכום ולהדביק בצ'אט עם שמואל. זמני העבודה נספרים בימי עסקים בלבד.</p>
+    <p class="note">אפשר גם לשלוח את הסיכום בוואטסאפ, או להעתיק ולהדביק בצ'אט עם שמואל. זמני העבודה נספרים בימי עסקים בלבד.</p>
   </section>
   </form>
 </div>
@@ -294,6 +295,7 @@ function build(){
   else t+='\nמחיר: ייסגר מול שמואל\n';
   document.getElementById('out').textContent=t;
   document.getElementById('wa').href='https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(t);
+  return {site,p,text:t};
 }
 
 document.getElementById('copy').onclick=async()=>{
@@ -370,6 +372,7 @@ async function send(text){
     if(!r.ok)throw new Error(r.status===429||r.status===503?'busy':'http');
     const d=await r.json();
     apply(d.updates);
+    if(d.model){lastModel=d.model;try{localStorage.setItem('intake-model',lastModel);}catch(e){}}
     chatLog.push({role:'model',text:d.reply});saveChat();
     wait.remove();bubble('model',d.reply);
     if(d.done)$('toSummary').classList.remove('ghost');
@@ -388,6 +391,24 @@ say.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDef
 $('toForm').onclick=()=>{setMode('form');go(0);};
 $('toSummary').onclick=()=>{setMode('form');go(steps.length-1);};
 $('toChat').onclick=()=>setMode('chat');
+
+/* ---------- שליחת הפנייה לגוגל שיטס של שמואל ---------- */
+let lastModel='';try{lastModel=localStorage.getItem('intake-model')||'';}catch(e){}
+$('sendLead').onclick=async()=>{
+  const btn=$('sendLead'),toast=$('toast');
+  const {site,p,text}=build();
+  btn.disabled=true;toast.textContent='שולח...';
+  try{
+    const r=await fetch('/api/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      biz:val('biz'),person:val('person'),phone:val('cphone')||val('pphone'),email:val('cmail')||val('pmail'),field:val('field'),
+      type:site?'אתר':'דף נחיתה',total:p?p.total:'',model:lastModel||'טופס רגיל',summary:text,
+      chat:chatLog.map(m=>(m.role==='user'?'לקוח: ':'עוזר: ')+m.text).join('\n')})});
+    if(!r.ok)throw new Error();
+    toast.textContent='הפנייה נשלחה! שמואל יעבור עליה ויחזור אליך בקרוב.';btn.textContent='נשלח ✓';
+  }catch(e){
+    btn.disabled=false;toast.textContent='השליחה לא הצליחה. אפשר לנסות שוב, או לשלוח בוואטסאפ.';
+  }
+};
 
 try{chatLog=JSON.parse(localStorage.getItem('intake-chat')||'[]');}catch(e){chatLog=[];}
 render();

@@ -4,27 +4,25 @@
 // Gemini answers with the next question plus which fields to fill. Prices are never
 // decided here: the page calculates them from the filled form.
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 // Tried in order: when one is overloaded, retired or slow, the next one answers.
 const MODELS = (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-flash-lite-latest')
   .split(',').map(s => s.trim()).filter(Boolean);
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 2000;
 
-const SYSTEM = `אתה העוזר הדיגיטלי של שמואל, שבונה דפי נחיתה ואתרים לעסקים קטנים.
-התפקיד שלך: לנהל עם הלקוח שיחה קצרה ונעימה בעברית, ולמלא בשבילו שאלון אפיון.
+// Shmuel's own instructions (tone, knowledge, FAQ) live in assistant-instructions.md so he can
+// edit them without touching code. HTML comments in that file are notes to him, not to the model.
+const INSTRUCTIONS = fs.readFileSync(path.join(process.cwd(), 'assistant-instructions.md'), 'utf8')
+  .replace(/<!--[\s\S]*?-->/g, '').trim();
 
-איך לנהל את השיחה:
-- כבר פתחת בברכה ושאלת על שם העסק ותחומו. אל תציג את עצמך שוב.
-- שאל שאלה אחת בכל פעם (לכל היותר שתיים קשורות), במשפט או שניים. בלי רשימות ארוכות.
-- דבר בגובה העיניים, בלי מונחים טכניים. אם הלקוח לא מבין משהו, הסבר בפשטות.
-- כשהלקוח מספר משהו, מלא מיד את כל השדות שאפשר להסיק ממנו, גם כאלה שלא שאלת עליהם.
-- אל תשאל על שדה שכבר מלא, אלא אם צריך לוודא משהו.
-- אפשר להציע אפשרויות מתוך הרשימות, כדי שיהיה ללקוח קל לענות.
-- סדר נושאים מומלץ: העסק ← מה הדף צריך להשיג וקהל היעד ← אילו אזורים בדף ← טקסטים ← עיצוב (לוגו, צבעים, סגנון) ← פרטי יצירת קשר שיופיעו בדף ← תמונות, דומיין, תוספות ודדליין.
-- אל תנקוב במחירים ואל תבטיח הנחות. המחיר מחושב אוטומטית בסוף לפי השאלון, ושמואל מאשר אותו.
-- אם הלקוח שואל משהו שלא קשור, ענה בקצרה והחזר בעדינות לשאלון.
-- אם הלקוח לא יודע או לא רוצה לענות, דלג הלאה.
-- כשכיסית את הנושאים העיקריים, שאל אם יש עוד משהו שחשוב לו. כשהוא אומר שלא, סיים במשפט קצר שמזמין אותו לראות את הסיכום והמחיר, וסמן done=true.
+// Rules the page depends on. They stay here so an edit to the instructions can't break the form.
+const SYSTEM = INSTRUCTIONS + `
+
+## כללים טכניים (חובה)
+- כשהשיחה הסתיימה (הלקוח אמר שאין לו עוד מה להוסיף), סמן done=true.
 
 איך למלא שדות (updates):
 - field הוא ה-id של השדה מהרשימה למטה, בדיוק.
@@ -80,8 +78,8 @@ export default async function handler(req, res) {
 
   // Move to the next model when one is rate-limited (429), overloaded (503), retired (404)
   // or slow (15s cap). Free-tier limits are per model, so the next one usually has room.
-  let r;
-  for (const model of MODELS) {
+  let r, model;
+  for (model of MODELS) {
     try {
       r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
@@ -120,5 +118,5 @@ export default async function handler(req, res) {
     .filter(u => u && ids.has(u.field) && Array.isArray(u.values))
     .map(u => ({ field: u.field, values: u.values.map(v => String(v).slice(0, 500)).slice(0, 20) }));
 
-  res.status(200).json({ reply: String(out.reply || '').slice(0, 3000), updates, done: !!out.done });
+  res.status(200).json({ reply: String(out.reply || '').slice(0, 3000), updates, done: !!out.done, model });
 }
