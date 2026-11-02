@@ -71,6 +71,7 @@ export default async function handler(req, res) {
 
   const generationConfig = { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.6 };
   if (MODEL.startsWith('gemini-2.5-flash')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  else if (MODEL.startsWith('gemini-3')) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
 
   const body = {
     systemInstruction: { parts: [{ text: SYSTEM + '\n\nשדות השאלון:\n' + fieldsJson + '\n\nמה שכבר מלא כרגע:\n' + stateJson }] },
@@ -78,22 +79,30 @@ export default async function handler(req, res) {
     generationConfig,
   };
 
+  // One retry when Gemini is overloaded (503) or slow; each try is capped at 20s.
   let r;
-  try {
-    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    return res.status(502).json({ error: 'upstream_unreachable' });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (e) {
+      r = null;
+    }
+    if (r && r.status !== 503) break;
+    if (attempt === 0) await new Promise(ok => setTimeout(ok, 1500));
   }
+  if (!r) return res.status(503).json({ error: 'busy', reason: 'timeout' });
   if (!r.ok) {
     const detail = await r.text();
     console.error('gemini', r.status, detail.slice(0, 500));
     let reason = '';
     try { const e = JSON.parse(detail).error; reason = e.status + ': ' + String(e.message).slice(0, 200); } catch (e) {}
-    return res.status(r.status === 429 ? 429 : 502).json({ error: r.status === 429 ? 'busy' : 'upstream_error', reason });
+    const busy = r.status === 429 || r.status === 503;
+    return res.status(busy ? r.status : 502).json({ error: busy ? 'busy' : 'upstream_error', reason });
   }
 
   let out;

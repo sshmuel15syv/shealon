@@ -367,7 +367,7 @@ async function send(text){
   const wait=bubble('model','רגע, חושב...','wait');
   try{
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatLog,fields:catalog(),state:state()})});
-    if(!r.ok)throw new Error(r.status===429?'busy':'http');
+    if(!r.ok)throw new Error(r.status===429||r.status===503?'busy':'http');
     const d=await r.json();
     apply(d.updates);
     chatLog.push({role:'model',text:d.reply});saveChat();
