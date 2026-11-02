@@ -78,7 +78,8 @@ export default async function handler(req, res) {
     return JSON.stringify({ systemInstruction: system, contents, generationConfig });
   };
 
-  // Move to the next model when one is overloaded (503), retired (404) or slow (15s cap).
+  // Move to the next model when one is rate-limited (429), overloaded (503), retired (404)
+  // or slow (15s cap). Free-tier limits are per model, so the next one usually has room.
   let r;
   for (const model of MODELS) {
     try {
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
     } catch (e) {
       r = null;
     }
-    if (r && r.status !== 503 && r.status !== 404) break;
+    if (r && ![429, 503, 404].includes(r.status)) break;
     console.error('gemini', model, r ? r.status : 'timeout');
   }
   if (!r) return res.status(503).json({ error: 'busy', reason: 'timeout' });
