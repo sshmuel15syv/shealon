@@ -4,7 +4,9 @@
 // Gemini answers with the next question plus which fields to fill. Prices are never
 // decided here: the page calculates them from the filled form.
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Tried in order: when one is overloaded, retired or slow, the next one answers.
+const MODELS = (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-flash-lite-latest')
+  .split(',').map(s => s.trim()).filter(Boolean);
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 2000;
 
@@ -53,10 +55,6 @@ const SCHEMA = {
 
 export default async function handler(req, res) {
   const key = process.env.GEMINI_API_KEY;
-  if (req.method === 'GET' && req.query && req.query.models === '1' && key) { // TEMP: list available models
-    const m = await (await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': key } })).json();
-    return res.status(200).json((m.models || []).filter(x => (x.supportedGenerationMethods || []).includes('generateContent')).map(x => x.name));
-  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   if (!key) return res.status(500).json({ error: 'missing_key' });
 
@@ -73,31 +71,28 @@ export default async function handler(req, res) {
   while (contents.length && contents[0].role === 'model') contents.shift();
   if (!contents.length || contents[contents.length - 1].role !== 'user') return res.status(400).json({ error: 'bad_request' });
 
-  const generationConfig = { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.6 };
-  if (MODEL.startsWith('gemini-2.5-flash')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  else if (MODEL.startsWith('gemini-3')) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
-
-  const body = {
-    systemInstruction: { parts: [{ text: SYSTEM + '\n\nשדות השאלון:\n' + fieldsJson + '\n\nמה שכבר מלא כרגע:\n' + stateJson }] },
-    contents,
-    generationConfig,
+  const system = { parts: [{ text: SYSTEM + '\n\nשדות השאלון:\n' + fieldsJson + '\n\nמה שכבר מלא כרגע:\n' + stateJson }] };
+  const bodyFor = model => {
+    const generationConfig = { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.6 };
+    if (model.startsWith('gemini-3')) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
+    return JSON.stringify({ systemInstruction: system, contents, generationConfig });
   };
 
-  // One retry when Gemini is overloaded (503) or slow; each try is capped at 20s.
+  // Move to the next model when one is overloaded (503), retired (404) or slow (15s cap).
   let r;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (const model of MODELS) {
     try {
-      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(20000),
+        body: bodyFor(model),
+        signal: AbortSignal.timeout(15000),
       });
     } catch (e) {
       r = null;
     }
-    if (r && r.status !== 503) break;
-    if (attempt === 0) await new Promise(ok => setTimeout(ok, 1500));
+    if (r && r.status !== 503 && r.status !== 404) break;
+    console.error('gemini', model, r ? r.status : 'timeout');
   }
   if (!r) return res.status(503).json({ error: 'busy', reason: 'timeout' });
   if (!r.ok) {
