@@ -89,8 +89,11 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'upstream_unreachable' });
   }
   if (!r.ok) {
-    console.error('gemini', r.status, (await r.text()).slice(0, 500));
-    return res.status(r.status === 429 ? 429 : 502).json({ error: r.status === 429 ? 'busy' : 'upstream_error' });
+    const detail = await r.text();
+    console.error('gemini', r.status, detail.slice(0, 500));
+    let reason = '';
+    try { const e = JSON.parse(detail).error; reason = e.status + ': ' + String(e.message).slice(0, 200); } catch (e) {}
+    return res.status(r.status === 429 ? 429 : 502).json({ error: r.status === 429 ? 'busy' : 'upstream_error', reason });
   }
 
   let out;
